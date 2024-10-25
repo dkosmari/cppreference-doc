@@ -18,7 +18,6 @@
 #   along with this program.  If not, see http://www.gnu.org/licenses/.
 
 import argparse
-import concurrent.futures
 import os
 import shutil
 
@@ -41,6 +40,7 @@ def main():
 
     # copy the source tree
     preprocess.rmtree_if_exists(root)
+    print("copying {} to {}".format(src, root))
     shutil.copytree(src, root)
 
     preprocess.rearrange_archive(root)
@@ -51,17 +51,10 @@ def main():
     # clean the html files
     file_list = preprocess.find_html_files(root)
 
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = [
-            executor.submit(preprocess.preprocess_html_file,
-                            root, fn, rename_map)
-            for fn in file_list
-        ]
-
-        for future in futures:
-            output = future.result()
-            if len(output) > 0:
-                print(output)
+    for fn in file_list:
+        output = preprocess.preprocess_html_file(root, fn, rename_map)
+        if len(output) > 0:
+            print(output)
 
     # append css modifications
 

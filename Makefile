@@ -15,63 +15,54 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see http://www.gnu.org/licenses/.
 
-SHELL := /bin/bash
-
-#Common prefixes
-
-prefix = /usr
-datarootdir = $(prefix)/share
+PREFIX ?= /usr
+datarootdir = $(PREFIX)/share
 docdir = $(datarootdir)/cppreference/doc
 bookdir = $(datarootdir)/devhelp/books
 
-qhelpgenerator = qhelpgenerator
+qhelpgenerator ?= qhelpgenerator
 
-#Version
+VERSION := $(shell date +%Y%m%d)
 
-VERSION=20240610
+DOWNLOAD_DIR := download
 
-#STANDARD RULES
+DISTFILES := \
+	build_link_map.py		\
+	commands/			\
+	ddg_parse_html.py		\
+	devhelp2qch.py			\
+	export.py			\
+	fix_devhelp-links.py		\
+	gadgets/			\
+	headers/			\
+	images/				\
+	index-chapters-c.xml		\
+	index-chapters-cpp.xml		\
+	index-cpp-search-app.txt	\
+	index-functions-c.xml		\
+	index-functions-cpp.xml		\
+	index-functions.README		\
+	index2autolinker.py		\
+	index2browser.py		\
+	index2ddg.py			\
+	index2devhelp.py		\
+	index2doxygen-tag.py		\
+	index2highlight.py		\
+	index2search.py			\
+	index_transform/		\
+	link_map.py			\
+	Makefile			\
+	preprocess-css.css		\
+	preprocess.py			\
+	preprocess_qch.py		\
+	README.md			\
+	reference/			\
+	skins/				\
+	test.sh				\
+	tests/				\
+	xml_utils.py
 
-all: doc_html doc_devhelp doc_qch doc_doxygen
-
-DISTFILES= \
-		commands/                   \
-		gadgets/                    \
-		headers/                    \
-		images/                     \
-		index_transform/            \
-		reference/                  \
-		skins/                      \
-		tests/                      \
-		build_link_map.py           \
-		ddg_parse_html.py           \
-		devhelp2qch.py              \
-		export.py                   \
-		fix_devhelp-links.py        \
-		index2autolinker.py         \
-		index2browser.py            \
-		index2ddg.py                \
-		index2devhelp.py            \
-		index2doxygen-tag.py        \
-		index2highlight.py          \
-		index2search.py             \
-		index-chapters-c.xml        \
-		index-chapters-cpp.xml      \
-		index-cpp-search-app.txt    \
-		index-functions.README      \
-		index-functions-c.xml       \
-		index-functions-cpp.xml     \
-		link_map.py                 \
-		preprocess.py               \
-		preprocess-css.css          \
-		preprocess_qch.py           \
-		test.sh                     \
-		xml_utils.py                \
-		Makefile                    \
-		README.md
-
-CLEANFILES= \
-		output
+CLEANFILES := output
 
 TAR_FORMAT := gz
 TAR_OPTION := z
@@ -80,173 +71,235 @@ ifeq ($(UNAME_S),Linux)
 	TAR_FORMAT := xz
 	TAR_OPTION := J
 endif
+TARBALL := cppreference-doc-$(VERSION).tar.$(TAR_FORMAT)
+
+
+.PHONY: 			\
+	all 			\
+	clean 			\
+	devhelp 		\
+	dist 			\
+	download 		\
+	doxygen 		\
+	html 			\
+	html-cssless 		\
+	indexes 		\
+	install 		\
+	install-devhelp 	\
+	install-html 		\
+	install-qch 		\
+	link-map 		\
+	qch 			\
+	uninstall 		\
+	uninstall-devhelp 	\
+	uninstall-html 		\
+	uninstall-qch
+
+
+all: html devhelp qch doxygen
+
 
 clean:
-	rm -rf $(CLEANFILES)
+	$(RM) -r $(CLEANFILES)
 
-check:
 
-dist: clean
-	mkdir -p "cppreference-doc-$(VERSION)"
-	cp -r $(DISTFILES) "cppreference-doc-$(VERSION)"
-	tar c$(TAR_OPTION)f "cppreference-doc-$(VERSION).tar.$(TAR_FORMAT)" "cppreference-doc-$(VERSION)"
-	rm -rf "cppreference-doc-$(VERSION)"
+dist:
+	mkdir -p cppreference-doc-$(VERSION)
+	cp -r $(DISTFILES) cppreference-doc-$(VERSION)
+	tar c$(TAR_OPTION)f $(TARBALL) cppreference-doc-$(VERSION)
+	$(RM) -r cppreference-doc-$(VERSION)
 
-install: all
-	# install the HTML book
-	pushd "output/reference" > /dev/null; \
-	find . -type f \
-		-exec install -DT -m 644 '{}' "$(DESTDIR)$(docdir)/html/{}" \; ; \
-	popd > /dev/null
 
-	# install the devhelp documentation
-	install -DT -m 644 "output/cppreference-doc-en-c.devhelp2" \
-		"$(DESTDIR)$(bookdir)/cppreference-doc-en-c/cppreference-doc-en-c.devhelp2"
-	install -DT -m 644 "output/cppreference-doc-en-cpp.devhelp2" \
-		"$(DESTDIR)$(bookdir)/cppreference-doc-en-cpp/cppreference-doc-en-cpp.devhelp2"
-	install -DT -m 644 "output/cppreference-doxygen-local.tag.xml" \
-		"$(DESTDIR)$(bookdir)/cppreference-doxygen-local.tag.xml"
-	install -DT -m 644 "output/cppreference-doxygen-web.tag.xml" \
-		"$(DESTDIR)$(bookdir)/cppreference-doxygen-web.tag.xml"
+install: install-html install-devhelp install-qch
 
-	# install the .qch (Qt Help) documentation
-	install -DT -m 644 "output/cppreference-doc-en-cpp.qch" \
-		"$(DESTDIR)$(docdir)/qch/cppreference-doc-en-cpp.qch"
 
-uninstall:
-	rm -rf "$(DESTDIR)$(docdir)"
-	rm -rf "$(DESTDIR)$(bookdir)"
+uninstall: uninstall-html uninstall-devhelp uninstall-qch
+
 
 release: all
-	rm -rf release
+	$(RM) -r release
 	mkdir -p release
 
-	# zip the distributable
-	mkdir -p "cppreference-doc-$(VERSION)"
-	cp -r $(DISTFILES) "cppreference-doc-$(VERSION)"
-	tar c$(TAR_OPTION)f "release/cppreference-doc-$(VERSION).tar.$(TAR_FORMAT)" "cppreference-doc-$(VERSION)"
-	zip -qr "release/cppreference-doc-$(VERSION).zip" "cppreference-doc-$(VERSION)"
-	rm -rf "cppreference-doc-$(VERSION)"
+	mkdir -p cppreference-doc-$(VERSION)
+	cp -r $(DISTFILES) cppreference-doc-$(VERSION)
+	tar c$(TAR_OPTION)f release/$(TARBALL) cppreference-doc-$(VERSION)
+	zip -qr release/cppreference-doc-$(VERSION).zip cppreference-doc-$(VERSION)
+	$(RM) -r cppreference-doc-$(VERSION)
+	cd output && \
+		tar c$(TAR_OPTION)f ../release/html-book-$(VERSION).tar.$(TAR_FORMAT) \
+			reference \
+			cppreference-doxygen-local.tag.xml \
+			cppreference-doxygen-web.tag.xml
+	cd output && \
+		zip -qr ../release/html-book-$(VERSION).zip \
+			reference \
+			cppreference-doxygen-local.tag.xml \
+			cppreference-doxygen-web.tag.xml
+	cd output && \
+		tar c$(TAR_OPTION)f ../release/qch-book-$(VERSION).tar.$(TAR_FORMAT) \
+			cppreference-doc-en-cpp.qch
+	cd output && \
+		zip -qr ../release/qch-book-$(VERSION).zip \
+			cppreference-doc-en-cpp.qch
 
-	# zip the html output
-	pushd "output"; \
-	tar c$(TAR_OPTION)f "../release/html-book-$(VERSION).tar.$(TAR_FORMAT)" "reference" \
-		"cppreference-doxygen-local.tag.xml" "cppreference-doxygen-web.tag.xml" ; \
-	zip -qr "../release/html-book-$(VERSION).zip" "reference" \
-		"cppreference-doxygen-local.tag.xml" "cppreference-doxygen-web.tag.xml" ; \
-	popd
+output:
+	mkdir -p $@
 
-	# zip qch
-	pushd "output"; \
-	tar c$(TAR_OPTION)f "../release/qch-book-$(VERSION).tar.$(TAR_FORMAT)" "cppreference-doc-en-cpp.qch"; \
-	zip -qr "../release/qch-book-$(VERSION).zip" "cppreference-doc-en-cpp.qch"; \
-	popd
 
-#WORKER RULES
-doc_html: output/reference
+output/indexes:
+	mkdir -p $@
 
-doc_devhelp: output/cppreference-doc-en-c.devhelp2 output/cppreference-doc-en-cpp.devhelp2
 
-doc_qch: output/cppreference-doc-en-cpp.qch
-
-doc_doxygen: output/cppreference-doxygen-web.tag.xml output/cppreference-doxygen-local.tag.xml
-
-#builds the title<->location map
-output/link-map.xml: output/reference
-	./build_link_map.py
-
-#build the .devhelp2 index
-output/cppreference-doc-en-c.devhelp2: output/reference output/link-map.xml
-	./index2devhelp.py $(docdir)/html index-chapters-c.xml  \
-		"C Standard Library reference" "cppreference-doc-en-c" "c" \
-		index-functions-c.xml "output/devhelp-index-c.xml"
-	./fix_devhelp-links.py "output/devhelp-index-c.xml"  \
-		"output/cppreference-doc-en-c.devhelp2"
-
-output/cppreference-doc-en-cpp.devhelp2: output/reference output/link-map.xml
-	./index2devhelp.py $(docdir)/html index-chapters-cpp.xml  \
-		"C++ Standard Library reference" "cppreference-doc-en-cpp" "cpp" \
-		index-functions-cpp.xml "output/devhelp-index-cpp.xml"
-	./fix_devhelp-links.py "output/devhelp-index-cpp.xml" \
-		"output/cppreference-doc-en-cpp.devhelp2"
-
-#build the .qch (QT help) file
-output/cppreference-doc-en-cpp.qch: output/qch-help-project-cpp.xml
-	#qhelpgenerator only works if the project file is in the same directory as the documentation
-	cp "output/qch-help-project-cpp.xml" "output/reference_cssless/qch.qhp"
-
-	pushd "output/reference_cssless" > /dev/null; \
-	$(qhelpgenerator) "qch.qhp" -o "../cppreference-doc-en-cpp.qch"; \
-	popd > /dev/null
-
-	rm -f "output/reference_cssless/qch.qhp"
-
-output/qch-help-project-cpp.xml: output/cppreference-doc-en-cpp.devhelp2 output/reference_cssless
-	#build the file list
-	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?><files>" > "output/qch-files.xml"
-
-	pushd "output/reference_cssless" > /dev/null; \
-	find . -type f -not -iname "*.ttf" \
-		-exec echo "<file>"'{}'"</file>" \; | LC_ALL=C sort >> "../qch-files.xml" ; \
-	popd > /dev/null
-
-	echo "</files>" >> "output/qch-files.xml"
-
-	#create the project (copies the file list)
-	./devhelp2qch.py --src=output/cppreference-doc-en-cpp.devhelp2 \
-		--dst=output/qch-help-project-cpp.xml \
-		--virtual_folder=cpp --file_list=output/qch-files.xml
-
-# build doxygen tag file
-output/cppreference-doxygen-local.tag.xml: output/reference output/link-map.xml
-	./index2doxygen-tag.py "output/link-map.xml" \
-		"index-functions-cpp.xml" \
-		"index-chapters-cpp.xml" \
-		"output/cppreference-doxygen-local.tag.xml"
-
-output/cppreference-doxygen-web.tag.xml: output/reference output/link-map.xml
-	./index2doxygen-tag.py web \
-		"index-functions-cpp.xml" \
-		"index-chapters-cpp.xml" \
-		"output/cppreference-doxygen-web.tag.xml"
-
-#create preprocessed archive
-output/reference:
-	mkdir -p output
-	./preprocess.py --src reference --dst output/reference
-
-output/reference_cssless: output/reference
-	./preprocess_qch.py --src output/reference --dst output/reference_cssless
-
-# create indexes for the wiki
-indexes:
-	mkdir -p output/indexes
-	./index2highlight.py index-functions-cpp.xml output/indexes/highlight-cpp
-	./index2highlight.py index-functions-c.xml output/indexes/highlight-c
-	./index2search.py index-functions-cpp.xml output/indexes/search-cpp
-	./index2search.py index-functions-c.xml output/indexes/search-c
-	cat index-cpp-search-app.txt >> output/indexes/search-cpp
+indexes: 				\
+		index-functions-c.xml 	\
+		index-functions-cpp.xml \
+		index2autolinker.py 	\
+		index2highlight.py 	\
+		index2search.py 	\
+		| output/indexes
 	./index2autolinker.py index-functions-c.xml output/indexes/autolink-c
 	./index2autolinker.py index-functions-cpp.xml output/indexes/autolink-cpp
+	./index2highlight.py index-functions-c.xml   output/indexes/highlight-c
+	./index2highlight.py index-functions-cpp.xml output/indexes/highlight-cpp
+	./index2search.py index-functions-c.xml   output/indexes/search-c
+	./index2search.py index-functions-cpp.xml output/indexes/search-cpp
 
-#redownloads the source documentation directly from en.cppreference.com
-source:
-	rm -rf "reference"
-	mkdir "reference"
 
-	pushd "reference" > /dev/null; \
-	regex=".*index\\.php.*|.*/Special:.*|.*/Talk:.*" \
-	regex+="|.*/Help:.*|.*/File:.*|.*/Cppreference:.*" \
-	regex+="|.*/WhatLinksHere:.*|.*/Template:.*|.*/Category:.*" \
-	regex+="|.*action=.*|.*printable=.*|.*en.cppreference.com/book.*" ; \
-	echo $$regex ; \
-	wget --adjust-extension --page-requisites --convert-links \
-		--force-directories --recursive --level=15 \
-		--span-hosts --domains=en.cppreference.com,upload.cppreference.com \
-		--reject-regex $$regex \
-		--timeout=5 --tries=50 --no-verbose \
-		--retry-connrefused --waitretry=10 --read-timeout=20 \
-		https://en.cppreference.com/w/ ; \
-	popd > /dev/null
+# redownload the source documentation directly from en.cppreference.com
+download: export.py | wiki
+	$(RM) -r $(DOWNLOAD_DIR)
+	mkdir -p $(DOWNLOAD_DIR)
+	REGEX='index\.php' \
+	REGEX+='|/(Special|Talk|Help|File|Cppreference):' \
+	REGEX+='|/(WhatLinksHere|Template|Category):' \
+	REGEX+='|(action|printable)=' \
+	REGEX+='|en\.cppreference\.com/book' \
+	REGEX+='|robots\.txt' ; \
+	wget \
+		--adjust-extension \
+		--convert-links \
+		--directory-prefix=$(DOWNLOAD_DIR) \
+		--execute robots=off \
+		--domains=en.cppreference.com,upload.cppreference.com \
+		--force-directories \
+		--level=inf \
+		--no-verbose \
+		--page-requisites \
+		--read-timeout=20 \
+		--recursive \
+		--reject-regex="$$REGEX" \
+		--retry-connrefused \
+		--span-hosts \
+		--timeout=10 \
+		--waitretry=10 \
+		https://en.cppreference.com/w/ || true
+	./export.py --url=https://en.cppreference.com/mwiki \
+		$(DOWNLOAD_DIR)/cppreference-export-ns0,4,8,10.xml \
+		0 4 8 10
 
-	./export.py --url=https://en.cppreference.com/mwiki reference/cppreference-export-ns0,4,8,10.xml 0 4 8 10
+
+link-map: html
+	./build_link_map.py
+
+
+html: | output
+	./preprocess.py --src $(DOWNLOAD_DIR) --dst output/reference
+
+
+html-cssless: html preprocess_qch.py
+	./preprocess_qch.py --src output/reference --dst output/reference_cssless
+
+
+install-html: html
+	cd output/reference && \
+		find . -type f \
+			-exec install -DT -m 644 '{}' '$(DESTDIR)$(docdir)/html/{}' ';'
+
+
+uninstall-html:
+	$(RM) -r $(DESTDIR)$(docdir)/html
+
+
+devhelp: link-map | indexes
+	./index2highlight.py index-functions-c.xml output/indexes/highlight-c
+	./index2devhelp.py 				\
+		--base $(docdir)/html 			\
+		--chapters index-chapters-c.xml  	\
+		--title "C Standard Library reference" 	\
+		--name cppreference-doc-en-c 		\
+		--rel c 				\
+		--src index-functions-c.xml 		\
+		--dst output/devhelp-index-c.xml 	\
+		--lang c
+	./index2devhelp.py 					\
+		--base $(docdir)/html 				\
+		--chapters index-chapters-cpp.xml 		\
+		--title "C++ Standard Library reference" 	\
+		--name cppreference-doc-en-cpp 			\
+		--rel cpp 					\
+		--src index-functions-cpp.xml 			\
+		--dst output/devhelp-index-cpp.xml 		\
+		--lang c++
+	./fix_devhelp-links.py output/devhelp-index-c.xml output/cppreference-doc-en-c.devhelp2
+	./fix_devhelp-links.py output/devhelp-index-cpp.xml output/cppreference-doc-en-cpp.devhelp2
+
+
+install-devhelp: devhelp doxygen install-html
+	install -DT -m 644 output/cppreference-doc-en-c.devhelp2 \
+		$(DESTDIR)$(bookdir)/cppreference-doc-en-c/cppreference-doc-en-c.devhelp2
+	install -DT -m 644 output/cppreference-doc-en-cpp.devhelp2 \
+		$(DESTDIR)$(bookdir)/cppreference-doc-en-cpp/cppreference-doc-en-cpp.devhelp2
+	install -DT -m 644 output/cppreference-doxygen-local.tag.xml \
+		$(DESTDIR)$(bookdir)/cppreference-doxygen-local.tag.xml
+	install -DT -m 644 output/cppreference-doxygen-web.tag.xml \
+		$(DESTDIR)$(bookdir)/cppreference-doxygen-web.tag.xml
+
+
+uninstall-devhelp:
+	$(RM) -r $(DESTDIR)$(bookdir)/cppreference-doc-en-c
+	$(RM) -r $(DESTDIR)$(bookdir)/cppreference-doc-en-cpp
+	$(RM) $(DESTDIR)$(bookdir)/cppreference-doxygen-local.tag.xml
+	$(RM) $(DESTDIR)$(bookdir)/cppreference-doxygen-web.tag.xml
+
+
+qch: devhelp
+	./preprocess_qch.py --src output/reference --dst output/reference_cssless --verbose
+	printf '<?xml version="1.0" encoding="UTF-8"?>\n<files>\n' > output/qch-files.xml
+	(cd output/reference_cssless; find . -type f -not -iname '*.ttf' -printf '  <file>%p</file>\n' | LC_ALL=C sort) >> output/qch-files.xml
+	printf '</files>\n' >> output/qch-files.xml
+	./devhelp2qch.py 					\
+		--src=output/cppreference-doc-en-cpp.devhelp2 	\
+		--file_list=output/qch-files.xml 		\
+		--virtual_folder=cpp 				\
+		--dst=output/qch-help-project-cpp.xml
+	ln -s output/qch-help-project-cpp.xml output/reference_cssless/qch.qhp
+	cd output/reference_cssless ; \
+		$(qhelpgenerator) \
+			qch.qhp \
+			-o ../cppreference-doc-en-cpp.qch
+	$(RM) output/reference_cssless/qch.qhp
+
+
+install-qch: qch
+	install -DT -m 644 output/cppreference-doc-en-cpp.qch \
+		$(DESTDIR)$(docdir)/qch/cppreference-doc-en-cpp.qch
+
+
+uninstall-qch:
+	$(RM) $(DESTDIR)$(docdir)/qch/cppreference-doc-en-cpp.qch
+
+
+doxygen: 				\
+		link-map 		\
+		index-functions-cpp.xml \
+		index-chapters-cpp.xml 	\
+		| output
+	./index2doxygen-tag.py 					\
+		output/link-map.xml 				\
+		index-functions-cpp.xml 			\
+		index-chapters-cpp.xml 				\
+		output/cppreference-doxygen-local.tag.xml
+	./index2doxygen-tag.py web 			\
+		index-functions-cpp.xml 		\
+		index-chapters-cpp.xml 			\
+		output/cppreference-doxygen-web.tag.xml

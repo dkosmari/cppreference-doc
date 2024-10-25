@@ -58,24 +58,30 @@ class Index2Devhelp(IndexTransform):
         IndexTransform.process_item_hook(self, el, full_name, full_link)
 
 
-def transform_devhelp(book_title, book_name, book_base, rel_link, chapters_fn,
-                      in_fn):
+def transform_devhelp(*,
+                      title,
+                      name,
+                      base,
+                      rel,
+                      chapters,
+                      src,
+                      language):
     root_el = etree.Element('book')
     root_el.set('xmlns', 'http://www.devhelp.net/book')
-    root_el.set('title', book_title)
-    root_el.set('name', book_name)
-    root_el.set('base', book_base)
-    root_el.set('link', rel_link)
+    root_el.set('title', title)
+    root_el.set('name', name)
+    root_el.set('base', base)
+    root_el.set('link', rel)
     root_el.set('version', '2')
-    root_el.set('language', 'c++')
+    root_el.set('language', language)
 
-    chapters_tree = etree.parse(chapters_fn)
+    chapters_tree = etree.parse(chapters)
     root_el.append(chapters_tree.getroot())
 
     functions_el = etree.SubElement(root_el, 'functions')
 
     tr = Index2Devhelp(functions_el)
-    tr.transform_file(in_fn)
+    tr.transform_file(src)
 
     return etree.tostring(root_el, pretty_print=True, xml_declaration=True,
                           encoding='utf-8')

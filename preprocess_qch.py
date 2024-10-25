@@ -18,7 +18,6 @@
 #   along with this program.  If not, see http://www.gnu.org/licenses/.
 
 import argparse
-import concurrent.futures
 import os
 import shutil
 
@@ -56,19 +55,10 @@ def main():
                 dst_path = os.path.join(dest_root, rel_path)
                 paths_list.append((src_path, dst_path))
 
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = [
-            executor.submit(preprocess_cssless.preprocess_html_merge_cssless,
-                            src_path, dst_path)
-            for src_path, dst_path in paths_list
-        ]
-
-        for i, future in enumerate(futures):
-            print('Processing file: {}/{}: {}'.format(
-                    i, len(paths_list), paths_list[i][1]))
-            output = future.result()
-            if verbose:
-                print(output)
+    for src_pat, dst_path in paths_list:
+        output = preprocess_cssless.preprocess_html_merge_cssless(src_path, dst_path)
+        if verbose:
+            print(output)
 
 
 if __name__ == "__main__":
